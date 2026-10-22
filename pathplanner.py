@@ -3,13 +3,15 @@ import pygame
 import heapq
 import random
 from collections import deque
+import time
+import csv
 
 pygame.init()
 
 # Grid settings
-ROWS = 20
-COLS = 20
-CELL_SIZE = 35
+ROWS = 48
+COLS = 43
+CELL_SIZE = 20
 
 GRID_WIDTH = COLS * CELL_SIZE
 GRID_LENGTH = ROWS * CELL_SIZE
@@ -20,7 +22,7 @@ LENGGRID_LENGTH = GRID_LENGTH + 65
 
 FPS = 60
 ANIMATION_SPEED = 3
-DENSITY =0.3
+DENSITY =0.45
 
 screen = pygame.display.set_mode((WIDTH, LENGGRID_LENGTH))
 pygame.display.set_caption("A* Pathfinding Visualizer")
@@ -184,31 +186,41 @@ def reset_search():
     bfs_nodes = 0
     astar_nodes = 0
 
+def randomize_endpoints():
+    global start, end
 
-def generate_maze():
+    start = (random.randrange(ROWS), random.randrange(COLS))
+    end = start
+    while end == start:            # make sure they're different cells
+        end = (random.randrange(ROWS), random.randrange(COLS))
+
+    obstacles.discard(start)       # never leave a wall on top of them
+    obstacles.discard(end)
+    reset_search()
+
+
+def generate_maze(density=DENSITY):
     if start is None or end is None:
         print("Select a start and end first!")
-        return
-    
-    for attempts in range (200):
+        return None
+
+    for attempts in range(1, 201):
         obstacles.clear()
 
         for row in range(ROWS):
             for col in range(COLS):
                 cell = (row, col)
-
-                if cell == start or cell == end:
-                    continue
-
-                if random.random() < DENSITY:
+                if cell != start and cell != end and random.random() < density:
                     obstacles.add(cell)
 
-        came_from, _,_ = solve(start, end)
+        came_from, _, _ = solve(start, end)
 
         if end in came_from:
-            print("Solvable maze generated!")
             reset_search()
-            break
+            return attempts
+
+    print("No solvable maze found in 200 attempts")
+    return None
 
 def run_comparison():
     global bfs_path, astar_path
@@ -247,6 +259,63 @@ def run_comparison():
         print("A* path length:", len(astar_path) - 1)
     else:
         print("A*: No path found")
+
+def benchmark_algorithms(trials=100):
+    if start is None or end is None:
+        print("Select start and end first!")
+        return
+
+    results = []
+    densities = [0.0, 0.1, 0.2, 0.3, 0.4, 0.45, 0.5, 0.55, 0.6]
+
+    for density in densities:
+        for trial in range(1, trials + 1):
+
+            randomize_endpoints()
+
+            # Generate a new solvable maze
+            attempts = generate_maze(density)
+            if attempts is None:
+                continue
+
+            # Benchmark BFS
+            bfs_start = time.perf_counter()
+            bfs_came_from, bfs_explored = bfs(start, end)
+            bfs_time = time.perf_counter() - bfs_start
+            bfs_path = reconpath(start, end, bfs_came_from)
+
+            # Benchmark A*
+            astar_start = time.perf_counter()
+            astar_came_from, _, astar_explored = solve(start, end)
+            astar_time = time.perf_counter() - astar_start
+            astar_path = reconpath(start, end, astar_came_from)
+
+            # Save this trial's results
+            results.append({
+                "Trial": trial,
+                "Density": density,
+                "Attempts": attempts, "Distance": heuristic(start,end),
+                "BFS Nodes": len(bfs_explored),
+                "A* Nodes": len(astar_explored),
+                "BFS Path Length": len(bfs_path) - 1 if bfs_path else None,
+                "A* Path Length": len(astar_path) - 1 if astar_path else None,
+                "BFS Time (ms)": round(bfs_time * 1000, 4),
+                "A* Time (ms)": round(astar_time * 1000, 4)
+            })
+
+        print(f"Finished density {density}")
+
+    if not results:
+        print("No solvable mazes were generated, so nothing was saved.")
+        return
+
+    # Export to CSV
+    with open("benchmark_results.csv", "w", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=results[0].keys())
+        writer.writeheader()
+        writer.writerows(results)
+
+    print("Benchmark complete! Saved to benchmark_results.csv")
 
 def draw_grid(offset_x, explored, path, color):
     visible_explored = set(explored[:animation_step])
@@ -343,6 +412,13 @@ while running:
                 end = None
                 reset_search()
 
+            elif event.key == pygame.K_t:
+                benchmark_algorithms(200)
+
+            elif event.key == pygame.K_x:
+                randomize_endpoints()
+    
+
     # Advance both animations together
     if animating:
         animation_step += ANIMATION_SPEED
@@ -371,6 +447,8 @@ while running:
         astar_path,
         PURPLE
     )
+
+    pygame.draw.line(screen, BLACK, (GRID_WIDTH, 0), (GRID_WIDTH, GRID_LENGTH), 4)
 
     # Bottom statistics panel
     pygame.draw.rect(
