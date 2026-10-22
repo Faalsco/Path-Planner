@@ -22,7 +22,7 @@ LENGGRID_LENGTH = GRID_LENGTH + 65
 
 FPS = 60
 ANIMATION_SPEED = 3
-DENSITY =0.45
+DENSITY =0.30
 
 screen = pygame.display.set_mode((WIDTH, LENGGRID_LENGTH))
 pygame.display.set_caption("A* Pathfinding Visualizer")
