@@ -85,11 +85,3 @@ The window shows the same grid twice: **BFS on the left, A\* on the right.**
 pip install pygame pandas matplotlib
 python3 pathplanner.py      # the visualizer (press T to run the benchmark)
 python3 make_charts.py      # build the charts from benchmark_results.csv
-```
-
-## What's next
-
-- Run the solvability experiment on 20×20, 50×50 and 100×100 grids to see the threshold sharpen toward 41%
-- Diagonal movement
-- A robot that only sees nearby cells and replans when it discovers a wall
-- Use this planner inside a 2D self-driving car simulator
